@@ -1,0 +1,3 @@
+CSRF_ENABLED = True
+SECRET_KEY = '478ghdskehtte83745f8302'
+UPDATED = True
