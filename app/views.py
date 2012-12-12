@@ -1,7 +1,7 @@
 from flask import *
 from app import app
 from config import UPDATED
-import socket, sys, random, threading, time
+import socket, sys, random, threading, time, os
 
 from proxy import Server
 import pdb
@@ -40,10 +40,42 @@ def updated():
 def index():
     return render_template("index.html")
 
-@app.route("/start")
+@app.route('/start', methods = ['GET', 'POST'])
 def start():
-    s.run()
-    return jsonify("started!")
+
+    parent_r, parent_w = os.pipe()
+    child_r, child_w = os.pipe()
+    pid = os.fork()
+
+    if pid:
+        os.write(parent_w, 'start')
+        while True:
+            message_length = int(os.read(child_r, 10))
+            message = os.read(child_r,message_length)
+            if message.find("status:") == 0:
+                response = {'status': message}
+                break
+            elif message.find("data:") == 0:
+                response = {'data': message}
+                return jsonify(response)
+                action = raw_input("Continue? --> ")
+                if action == 'c':
+                    os.write(parent_w, 'c')
+                elif action == 'd':
+                    os.write(parent_w, 'd')
+            else:
+                pass
+        return jsonify(response)
+    else: # I'm the child
+        instruction = os.read(parent_r, 99999)
+        if instruction == 'start':
+            s.run(parent_r, child_w)
+        elif instruction == 'stop':
+            s.stop()
+
+
+
+
 
 
 

@@ -23,7 +23,8 @@ function wait_for_update() {
    // provides data needn't be changed from what's required for standard,
    // non-long polling web app.
     var url = '/updated'
-    $.ajax({ url:     url,
+    $.ajax({ type: "POST",
+             url:     url,
              success: load_data,
              complete: wait_for_update,
              timeout: 60000,
@@ -31,33 +32,35 @@ function wait_for_update() {
 }
 
 function start() {
-
+    console.log("inside start")
     var url = '/start'
-    $.ajax({ url:     url,
-             complete: function(data) {
-                          alert(data);
-                          wait_for_update();},
+    $.ajax({ type: "POST",
+             url:     url,
+             success: function(data) {
+                        console.log("success from start ajax", data)
+                        display_data(data)},
          });
 }
 
 
 function display_data(data) {
 	// show the data acquired by load_data()
-
-	if (data && (data != prev_data)) { // if there is data, and it's changed
+    console.log("inside of display_data")
+	if (data) { // if there is data, and it's changed
         // update the contents of several HTML elements via JQuery
 
         $("#search_box").val(data.status);
-        $("#request_bar").val(data.request_bar);
-        $("#raw_request").val(data.raw_request);
+        $("#intercept_btn").val('Turn Intercept OFF');
+        //$("#request_bar").val(data.request_bar);
+        //$("#raw_request").val(data.raw_request);
 
         // remember this data, in case we want to compare it to the next update
         prev_data = data;
 
         // a little UI sparkle - show the #updated div, then after a little while,
         // fade it away.
-        $("#updated"). fadeIn('fast');
-        setTimeout(function() { $("#updated").fadeOut('slow'); }, 2500);
+        //$("#updated"). fadeIn('fast');
+        //setTimeout(function() { $("#updated").fadeOut('slow'); }, 2500);
 	}
 }
 
@@ -67,16 +70,22 @@ $(document).ready(function() {
 	//$("div#updated").fadeOut(0);
 	//$("div#contents").append("awaiting data...");
 	//When page loads...
-    $("#search_box").val("Intercept is OFF");
 
+    console.log("inside document ready")
     //On Click Event
     $("#intercept").submit(function() {
         if ($("#intercept_btn").val() == 'Turn Intercept ON') {
-           $("#intercept_btn").val('Turn Intercept OFF');
            start();
+           console.log("start was called")
         }
+        return false;
     });
 	// load initial data ( assuming it will be immediately available)
 	//load_data();
 	 // wait_for_update(); otherwise
+});
+
+$(document).ajaxStop(function(){
+    console.log("inside ajaxstop")
+    setTimeout(20)
 });
