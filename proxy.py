@@ -13,10 +13,26 @@ isAvailable = True
 
 
 def msg_len(message):
+
     message_length = str(len(message))
+    try:
+        int(message_length)
+    except:
+        pdb.set_trace()
     while len(message_length) != 10:
         message_length += " "
     return message_length
+
+def check_for_response(parent_r):
+    while True:
+        message_length = int(os.read(parent_r, 10))
+        message = os.read(parent_r,message_length)
+        response = ""
+        if message == 'forward' or message == 'drop':
+            response = message
+            return response
+        else:
+            time.sleep(0.5)
 
 class Server:
     def __init__(self):
@@ -28,17 +44,16 @@ class Server:
         self.parent_r = ''
         self.child_w = ''
         self.isRunning = False
+        self.Listener_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.Listener_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     def start(self, parent_r, child_w):
         try:
-            self.Listener_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.Listener_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.Listener_socket.bind((self.localhost, self.port))
             self.Listener_socket.listen(50)
-            message = "Status: listening on socket"
+            message = "status: listening on socket"
             msglen = msg_len(message)
             os.write(child_w, msglen + message)
-            #print "listening on socket"
 
         except socket.error, (value, message):
             if self.Listener_socket:
@@ -50,12 +65,19 @@ class Server:
             self.Listener_socket.close()
             sys.exit(1)
 
-    def stop(self):
+    def stop(self, parent_r, child_w):
         try:
             self.isRunning = False
             self.Listener_socket.close()
+            message = "status: listener socket closed"
+            msglen = msg_len(message)
+            os.write(child_w, msglen + message)
+            sys.exit(1)
         except:
-            print "error"
+            message = "status: error closing socket"
+            msglen = msg_len(message)
+            os.write(child_w, msglen + message)
+            sys.exit(1)
 
     def run(self, parent_r, child_w):
         self.start(parent_r, child_w)
@@ -132,9 +154,9 @@ class Client(threading.Thread):
                 else:
                     break
             except socket.timeout, socket.error:
-                message = 'status: request timeout or socket error'
-                msglen = msg_len(message)
-                os.write(self.child_w, msglen + message)
+                #message = 'status: request timeout or socket error'
+                #msglen = msg_len(message)
+                #os.write(self.child_w, msglen + message)
                 #print "request timeout OR socket error"
                 break
             except IOError:
@@ -157,10 +179,8 @@ class Client(threading.Thread):
                         message = 'data:' + HTTP_Request
                         msglen = msg_len(message)
                         os.write(self.child_w, msglen + message)
-                        #print "REQUEST"
-                        response = os.read(self.parent_r, 99999)
-                        #response = raw_input('Continue or Drop? ---->')
-                        if response == 'c':
+                        response = check_for_response(self.parent_r)
+                        if response == 'forward':
 
                             try:
                                 Relay_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -183,13 +203,11 @@ class Client(threading.Thread):
                                 break
 
                             Relay_socket.sendall(HTTP_Request)
-
                             message = 'status: Forwarding to host'
                             msglen = msg_len(message)
                             os.write(self.child_w, msglen + message)
-                            #prev_timeout = Relay_socket.gettimeout()
                             try:
-                                Relay_socket.settimeout(0.8)
+                                Relay_socket.settimeout(5)
                                 HTTP_Response = ""
 
                                 while True:
@@ -200,30 +218,26 @@ class Client(threading.Thread):
                                         else:
                                             break
                                     except socket.timeout, socket.error:
-                                        message = 'status: timeout or socket error'
-                                        msglen = msg_len(message)
-                                        os.write(self.child_w, msglen + message)
-                                        #print "TIMEOUT OR socket error"
+                                        #message = 'status: timeout or socket error'
+                                        #msglen = msg_len(message)
+                                        #os.write(self.child_w, msglen + message)
                                         break
                                     except IOError:
-                                        #print "ioerror"
                                         message = 'status: ioerror'
                                         msglen = msg_len(message)
                                         os.write(self.child_w, msglen + message)
                                         break
 
                             finally:
-                                #Relay_socket.settimeout(prev_timeout)
                                 if not HTTP_Response == "":
-                                    #print 'Received data back. Forwarding to the client...'
-                                    #os.write(self.child_w, 'status: Received data back.')
                                     message = 'data:' + HTTP_Response
                                     msglen = msg_len(message)
                                     os.write(self.child_w, msglen + message)
-                                    #print "RESPONSE: "
-                                    #response_action = raw_input('Continue or Drop? ---->')
-                                    response_action = os.read(self.parent_r, 99999)
-                                    if response_action == 'c':
+                                    response_action = check_for_response(self.parent_r)
+                                    if response_action == 'forward':
+                                        message = 'status: Forwarding to browser'
+                                        msglen = msg_len(message)
+                                        os.write(self.child_w, msglen + message)
                                         self.client.sendall(HTTP_Response)
                                     else:
                                         pass
